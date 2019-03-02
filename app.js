@@ -4,8 +4,14 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 
+//lodash
+const _ = require("lodash");
+
 // 1st require mongoose
 const mongoose = require('mongoose');
+// To avoid
+//(node:12872) DeprecationWarning: collection.findAndModify is deprecated. Use findOneAndUpdate, findOneAndReplace or findOneAndDelete instead.
+mongoose.set('useFindAndModify', false);
 
 //this requires the date.js module, which is just a function that gives today's date
 const date = require(__dirname + "/date.js");
@@ -13,6 +19,7 @@ const date = require(__dirname + "/date.js");
 
 const app = express();
 
+const day = date();
 
 app.set("view engine", "ejs");
 
@@ -22,8 +29,8 @@ app.use(express.static("public"));
 
 /*MONGODB  ---- INTEGRATION*/
 
-//connect to mongoDB database
-mongoose.connect("mongodb://localhost:27017/todolistDB", {useNewUrlParser: true});
+//connect to mongoDB database con atlas server
+mongoose.connect("mongodb+srv://admin:algo1234@cluster0-ekehs.mongodb.net/todolistDB", {useNewUrlParser: true});
 //create the schema for the items.
 const itemSchema = new mongoose.Schema ({
   name: String,
@@ -49,11 +56,21 @@ const item3 = new Item({
 const defaultItems = [item1, item2, item3];
 
 
+//list schema for custom route lists
+const listSchema = new mongoose.Schema ({
+  name: String,
+  items: [itemSchema],
+
+});
+//mongoose model for custom route schemas
+const List = mongoose.model("List", listSchema);
+
+
+
 /*default home route, which puts in the default items if there arent any.
 This avoids creating defaultItems every time server starts*/
 
 app.get("/", function(req, res) {
-let day = date();
   Item.find({}, function(err, foundItems){
     if (foundItems.length === 0) {
       Item.insertMany(defaultItems, function(err){
@@ -65,9 +82,34 @@ let day = date();
       });
       res.redirect("/");
     } else {
-      res.render("list", {listTitle: day, newListItems: foundItems});
+      res.render("list", {listTitle: "Today", newListItems: foundItems, today:day});
     }
   });
+
+});
+
+app.get("/:customListName", (req,res) => {
+  //this will generate a new list for each custom route we put.
+const customListName = _.capitalize(req.params.customListName);
+// if there is a list allready with the name, it wont create a new one with
+// the following code
+List.findOne({name:customListName}, (err, foundList) => {
+  if (!err){
+    if(!foundList){
+      //creates a new list
+      const list = new List({
+        name: customListName,
+        items: defaultItems
+      });
+      list.save();
+      //must redirect to the new custom list if new one is created.
+      res.redirect("/" + customListName);
+    } else {
+      res.render("list", {listTitle: foundList.name, newListItems: foundList.items, today:day});
+    }
+  }
+});
+
 
 });
 
@@ -76,13 +118,21 @@ let day = date();
 app.post("/", (req, res) => {
 
   const itemName = req.body.newItem;
-
+  const listName = req.body.list;
   const item = new Item({
     name: itemName
   });
 
-  item.save();
-  res.redirect("/");
+  if (listName === "Today") {
+    item.save();
+    res.redirect("/");
+  } else {
+    List.findOne({name:listName}, (err, foundList) => {
+      foundList.items.push(item);
+      foundList.save();
+      res.redirect("/" + listName);
+    });
+  }
 
 
 
@@ -93,35 +143,22 @@ app.post("/", (req, res) => {
 
 app.post("/delete", function(req,res){
   const checkedItemId = req.body.checkbox;
-  Item.findByIdAndDelete(checkedItemId, function(err){
-    if (!err) {
-      console.log('successfully deleted checked item');}
-  });
-  res.redirect("/");
-});
+  const listName = req.body.listName;
+
+  if (listName === "Today") {   Item.findByIdAndDelete(checkedItemId, function(err){
+      if (!err) {
+        console.log('at ' + ' " ' + __filename +  ' " ' + ' successfully deleted checked item');}
+    });
+    res.redirect("/");
+  } else {
+List.findOneAndUpdate({name: listName}, {$pull: {items: {_id: checkedItemId}}}, (err, foundList) => {
+  if (!err){
+    res.redirect("/" + listName);
+  }
+} );
+  }
 
 
-
-//Will add this route later on. As a separate DB.
-// app.get("/work", (req, res) => {
-//
-//   /* same as the other app.get but it renders a work list, which features a different
-//   array, which is empty.
-//   This shows the use of EJS templating, ie, the daily todo list, and the work todolist are rendered from the same
-//   ejs file, which is list.ejs, but we change the arguments passed on to the list.ejs template via the listTitle and the
-//   array after it.
-//
-//   So that gives the result of two similar pages, which use the template, but are different in content.,
-//
-//   You can access it by going to the directory /work , thats the route.
-//   */
-//
-//   res.render("list", {listTitle: "Work List", newListItems: workItems});
-// } );
-
-//Just testing another route, this time the file is blank,
-app.get("/about", (req, res) => {
-res.render("about");
 });
 
 

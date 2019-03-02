@@ -5,4 +5,15 @@
   by MC
 </footer>
 
+<script type="text/javascript">
+
+  console.log(date);
+  if(document.querySelector("h1").innerText === "Today") {
+    var date = "<%= today %>";
+     document.querySelector("h1").innerText =  date ;
+
+  }
+
+</script>
+
 </html>
