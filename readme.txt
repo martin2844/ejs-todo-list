@@ -9,3 +9,6 @@
     - changed the 'day' ejs value being sent, to 'today', in order for the code to work, since
     the day var was giving trouble on other lines of code.
     - Added MongoDB Atlas Server integration.
+
+1.1 - added the gitignore file.
+    - Will try and deploy to heroku. If it works, next version will be 2.0
